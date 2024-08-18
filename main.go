@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"golang.org/x/tools/go/ast/astutil"
 	"os"
 	"path/filepath"
 )
@@ -39,12 +40,11 @@ func checkFile(filePath string) {
 		return
 	}
 
-	// Traverse the AST and check for function arguments named "context"
-	ast.Inspect(f, func(node ast.Node) bool {
-		fmt.Println(f)
-		switch n := node.(type) {
+	// Traverse the AST and apply function on each
+	astutil.Apply(f, func(c *astutil.Cursor) bool {
+		switch n := c.Node().(type) {
 		case *ast.FuncDecl:
-			handleFuncDecl(stuff[*ast.FuncDecl]{
+			handleFuncDecl(astContext[*ast.FuncDecl]{
 				node:     n,
 				fileSet:  fset,
 				filePath: filePath,
@@ -52,10 +52,10 @@ func checkFile(filePath string) {
 			})
 		}
 		return true
-	})
+	}, nil)
 }
 
-func handleFuncDecl(data stuff[*ast.FuncDecl]) {
+func handleFuncDecl(data astContext[*ast.FuncDecl]) {
 	checkContextName(data)
 	injectContext(data, map[string]map[string]struct{}{})
 }
