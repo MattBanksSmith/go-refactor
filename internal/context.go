@@ -14,6 +14,7 @@ type astContext[T any] struct {
 	fileSet  *token.FileSet
 	filePath string
 	file     *ast.File
+	printer  *printer.Config
 }
 
 func checkContextName(data astContext[*ast.FuncDecl]) {
@@ -53,8 +54,7 @@ func injectContext(data astContext[*ast.FuncDecl], functionList map[string]map[s
 	}
 	defer file.Close()
 
-	cfg := &printer.Config{Mode: printer.UseSpaces | printer.TabIndent, Tabwidth: 8}
-	if err = cfg.Fprint(file, data.fileSet, data.file); err != nil {
+	if err = data.printer.Fprint(file, data.fileSet, data.file); err != nil {
 		return err
 	}
 

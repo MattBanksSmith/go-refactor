@@ -11,7 +11,7 @@ import (
 )
 
 // eventually pass config into the application to drive refactor.
-// Not yet implemented - need abstraction to form
+// Not yet implemented - need abstraction to form and work out the contract
 type config struct {
 }
 
