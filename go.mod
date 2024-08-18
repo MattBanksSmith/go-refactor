@@ -1,4 +1,4 @@
-module linter
+module go-refactor
 
 go 1.22
 

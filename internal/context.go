@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"fmt"
@@ -6,9 +6,15 @@ import (
 	"go/printer"
 	"go/token"
 	"golang.org/x/tools/go/ast/astutil"
-	"log"
 	"os"
 )
+
+type astContext[T any] struct {
+	node     T
+	fileSet  *token.FileSet
+	filePath string
+	file     *ast.File
+}
 
 func checkContextName(data astContext[*ast.FuncDecl]) {
 	for _, param := range data.node.Type.Params.List {
@@ -20,25 +26,42 @@ func checkContextName(data astContext[*ast.FuncDecl]) {
 	}
 }
 
-type astContext[T any] struct {
-	node     T
-	fileSet  *token.FileSet
-	filePath string
-	file     *ast.File
-}
-
 // injectContext rewrites a function signature to have context as the first argument
-func injectContext(data astContext[*ast.FuncDecl], functionList map[string]map[string]struct{}) {
+func injectContext(data astContext[*ast.FuncDecl], functionList map[string]map[string]struct{}) error {
 	for _, param := range data.node.Type.Params.List {
 		switch t := param.Type.(type) {
 		case *ast.SelectorExpr:
 			x, ok := t.X.(*ast.Ident)
 			if ok && x.Name == "context" && t.Sel.Name == "Context" {
-				return
+				return nil
 			}
 		}
 	}
 
+	newParam := createCtxParam(data)
+
+	// Force context as the first argument
+	data.node.Type.Params.List = append([]*ast.Field{newParam}, data.node.Type.Params.List...)
+
+	if !importExists(data.file, "context") {
+		astutil.AddImport(data.fileSet, data.file, "context")
+	}
+
+	file, err := os.Create(data.filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	cfg := &printer.Config{Mode: printer.UseSpaces | printer.TabIndent, Tabwidth: 8}
+	if err = cfg.Fprint(file, data.fileSet, data.file); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createCtxParam(data astContext[*ast.FuncDecl]) *ast.Field {
 	// Todo almost certainly a bug with the positions here, e.g. multi line function declarations
 	// pos is necessary to set to avoid trailing commas. When unset the line number is 0 causing nodes.go to
 	// incorrectly identify if its a multiline function or not
@@ -59,25 +82,7 @@ func injectContext(data astContext[*ast.FuncDecl], functionList map[string]map[s
 			Sel: selIdent,
 		},
 	}
-
-	// Force context as the first argument
-	data.node.Type.Params.List = append([]*ast.Field{newParam}, data.node.Type.Params.List...)
-
-	if !importExists(data.file, "context") {
-		astutil.AddImport(data.fileSet, data.file, "context")
-	}
-
-	file, err := os.Create(data.filePath)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer file.Close()
-
-	cfg := &printer.Config{Mode: printer.UseSpaces | printer.TabIndent, Tabwidth: 8}
-	if err = cfg.Fprint(file, data.fileSet, data.file); err != nil {
-		log.Println(err)
-	}
+	return newParam
 }
 
 func importExists(f *ast.File, name string) bool {
