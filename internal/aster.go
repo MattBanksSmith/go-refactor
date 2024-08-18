@@ -31,7 +31,7 @@ func checkFile(filePath string) {
 		panic(err)
 	}
 
-	file, err := parser.ParseFile(fileSet, filePath, src, parser.AllErrors)
+	file, err := parser.ParseFile(fileSet, filePath, src, parser.AllErrors|parser.ParseComments)
 	if err != nil {
 		log.Printf("Error parsing file %s: %v\n", filePath, err)
 		return

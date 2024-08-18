@@ -16,6 +16,7 @@ import (
 func TestIntegration(t *testing.T) {
 	const dirTemp = "temp"
 	const dirBefore = "before"
+	const dirWant = "want"
 
 	err := deleteAllFiles(dirTemp)
 	if err != nil {
@@ -26,13 +27,14 @@ func TestIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer deleteAllFiles(dirTemp)
 
 	err = internal.Do(dirTemp)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = compareDirs(dirTemp, dirBefore)
+	err = compareDirs(dirTemp, dirWant)
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,17 +120,19 @@ func compareDirs(dir1, dir2 string) error {
 		file2Path := filepath.Join(dir2, file1.Name())
 
 		file1Stat, err := os.Stat(file1Path)
+		fmt.Println(file1Stat)
 		if os.IsNotExist(err) {
 			return fmt.Errorf("File %s does not exist in %s\n", file1.Name(), dir2)
 		}
 
 		file2Stat, err := os.Stat(file2Path)
+		fmt.Println(file2Stat)
 		if os.IsNotExist(err) {
 			return fmt.Errorf("File %s does not exist in %s\n", file1.Name(), dir2)
 		}
 
 		if file1Stat.Size() != file2Stat.Size() {
-			return fmt.Errorf("File %s differs in size\n", file1.Name())
+			return fmt.Errorf("File %s differs in size: %v %v\n", file1.Name(), file1Stat.Size(), file2Stat.Size())
 		}
 
 		content1, err := os.ReadFile(file1Path)
