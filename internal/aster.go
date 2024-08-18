@@ -10,6 +10,17 @@ import (
 	"path/filepath"
 )
 
+// eventually pass config into the application to drive refactor.
+// Not yet implemented - need abstraction to form
+type config struct {
+}
+
+type configItem struct {
+	nodeType  string //type e.g. funcDecl
+	operation string //replace, add or replace, rename
+
+}
+
 func Do(dir string) error {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
