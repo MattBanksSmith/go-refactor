@@ -1,8 +1,11 @@
 package internal
 
 import (
+	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"golang.org/x/tools/go/ast/astutil"
 	"log"
@@ -10,15 +13,12 @@ import (
 	"path/filepath"
 )
 
-// eventually pass config into the application to drive refactor.
-// Not yet implemented - need abstraction to form and work out the contract
-type config struct {
-}
-
-type configItem struct {
-	nodeType  string //type e.g. funcDecl
-	operation string //replace, add or replace, rename
-
+type astContext[T any] struct {
+	node     T
+	fileSet  *token.FileSet
+	filePath string
+	file     *ast.File
+	printer  *printer.Config
 }
 
 func Do(dir string) error {
@@ -39,7 +39,8 @@ func checkFile(filePath string) {
 	fileSet := token.NewFileSet()
 	src, err := os.ReadFile(filePath)
 	if err != nil {
-		panic(err)
+		log.Printf("Error reading file %s: %v\n", filePath, err)
+		return
 	}
 
 	file, err := parser.ParseFile(fileSet, filePath, src, parser.AllErrors|parser.ParseComments)
@@ -47,6 +48,15 @@ func checkFile(filePath string) {
 		log.Printf("Error parsing file %s: %v\n", filePath, err)
 		return
 	}
+
+	pkg, err := build.ImportDir(filepath.Dir(filePath), build.IgnoreVendor)
+	if err != nil {
+		log.Printf("Error importing directory %s: %v\n", filepath.Dir(filePath), err)
+		return
+	}
+
+	//todo does this only work with gopath?
+	fmt.Println(pkg.ImportPath)
 
 	// Traverse the AST and apply function on each
 	astutil.Apply(file, func(c *astutil.Cursor) bool {
@@ -57,6 +67,7 @@ func checkFile(filePath string) {
 				fileSet:  fileSet,
 				filePath: filePath,
 				file:     file,
+				printer:  &printer.Config{},
 			})
 		}
 		return true

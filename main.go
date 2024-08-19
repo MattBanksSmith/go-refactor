@@ -9,6 +9,7 @@ import (
 func main() {
 	if len(os.Args) == 1 {
 		log.Println("provide a directory")
+		return
 	}
 
 	// Specify the directory to scan for Go files

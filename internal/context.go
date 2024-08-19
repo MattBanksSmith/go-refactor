@@ -3,19 +3,9 @@ package internal
 import (
 	"fmt"
 	"go/ast"
-	"go/printer"
-	"go/token"
 	"golang.org/x/tools/go/ast/astutil"
 	"os"
 )
-
-type astContext[T any] struct {
-	node     T
-	fileSet  *token.FileSet
-	filePath string
-	file     *ast.File
-	printer  *printer.Config
-}
 
 func checkContextName(data astContext[*ast.FuncDecl]) {
 	for _, param := range data.node.Type.Params.List {

@@ -27,7 +27,7 @@ func TestIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer deleteAllFiles(dirTemp)
+	//defer deleteAllFiles(dirTemp)
 
 	err = internal.Do(dirTemp)
 	if err != nil {
