@@ -1,13 +1,14 @@
 package internal
 
 import (
+	"bufio"
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"golang.org/x/tools/go/ast/astutil"
+	"golang.org/x/tools/go/packages"
 	"log"
 	"os"
 	"path/filepath"
@@ -34,6 +35,22 @@ func Do(dir string) error {
 	return err
 }
 
+func getFuncList() (map[string]struct{}, error) {
+	f, err := os.Open("data.txt")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	result := make(map[string]struct{})
+	for scanner.Scan() {
+		line := scanner.Text()
+		result[line] = struct{}{}
+	}
+	return result, nil
+}
+
 func checkFile(filePath string) {
 	// Parse the Go file
 	fileSet := token.NewFileSet()
@@ -49,32 +66,88 @@ func checkFile(filePath string) {
 		return
 	}
 
-	pkg, err := build.ImportDir(filepath.Dir(filePath), build.IgnoreVendor)
+	funcList, err := getFuncList()
 	if err != nil {
-		log.Printf("Error importing directory %s: %v\n", filepath.Dir(filePath), err)
+		log.Printf("Error getting function list: %v\n", err)
 		return
 	}
-
-	//todo does this only work with gopath?
-	fmt.Println(pkg.ImportPath)
 
 	// Traverse the AST and apply function on each
 	astutil.Apply(file, func(c *astutil.Cursor) bool {
 		switch n := c.Node().(type) {
 		case *ast.FuncDecl:
-			handleFuncDecl(astContext[*ast.FuncDecl]{
-				node:     n,
+			name := getFullName(n)
+			pkg, err := getImportPath(filePath)
+			if err != nil {
+				log.Printf("Error getting import path for %s: %v\n", filePath, err)
+			}
+			fmt.Println(pkg + "." + name)
+			if _, ok := funcList[pkg+"."+name]; !ok {
+				return true
+			}
+
+			handleFuncDecl(astContext[*ast.FuncType]{
+				node:     n.Type,
 				fileSet:  fileSet,
 				filePath: filePath,
 				file:     file,
 				printer:  &printer.Config{},
 			})
+		case *ast.FuncLit:
+			//Todo how on earth to handle anonymous funcs?
+			/*handleFuncDecl(astContext[*ast.FuncType]{
+				node:     n.Type,
+				fileSet:  fileSet,
+				filePath: filePath,
+				file:     file,
+				printer:  &printer.Config{},
+			})*/
 		}
 		return true
 	}, nil)
 }
 
-func handleFuncDecl(data astContext[*ast.FuncDecl]) {
+func getImportPath(filePath string) (string, error) {
+	cfg := &packages.Config{
+		Mode:  packages.NeedName | packages.NeedFiles,
+		Tests: false,
+	}
+	pkgs, err := packages.Load(cfg, fmt.Sprintf("file=%s", filePath))
+	if err != nil {
+		return "", err
+	}
+
+	if len(pkgs) == 0 {
+		return "", fmt.Errorf("no package found for file: %s", filePath)
+	}
+
+	return pkgs[0].PkgPath, nil
+}
+
+func getFullName(fn *ast.FuncDecl) string {
+	var fullName string
+	if fn.Recv != nil {
+		// receiver method
+		recvType := "unknown"
+		if len(fn.Recv.List) > 0 {
+			switch expr := fn.Recv.List[0].Type.(type) {
+			case *ast.Ident:
+				recvType = expr.Name
+			case *ast.StarExpr:
+				if ident, ok := expr.X.(*ast.Ident); ok {
+					recvType = ident.Name
+				}
+			}
+		}
+		fullName = fmt.Sprintf("%s.%s", recvType, fn.Name.Name)
+	} else {
+		// Function
+		fullName = fn.Name.Name
+	}
+	return fullName
+}
+
+func handleFuncDecl(data astContext[*ast.FuncType]) {
 	checkContextName(data)
 	err := injectContext(data, map[string]map[string]struct{}{})
 	if err != nil {

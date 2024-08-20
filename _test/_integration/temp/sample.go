@@ -3,7 +3,7 @@ package before
 
 import "context"
 
-// test is a function
-func test(ctx context.Context) {
+// Test is a function
+func Test(ctx context.Context) {
 
 }
